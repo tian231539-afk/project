@@ -4,10 +4,9 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Copy, Send, Sparkles, User, Heart, MessageCircle, Loader2, Check, Trash2, Save, Settings } from 'lucide-react';
+import { Copy, Send, User, MessageSquare, Loader2, Check, Trash2 } from 'lucide-react';
 
 const replyStyles = [
   { id: 'humorous', name: '幽默风趣' },
@@ -18,7 +17,6 @@ const replyStyles = [
 ];
 
 const STORAGE_KEY = 'dating_chat_assistant_data';
-const API_KEY_STORAGE = 'dating_chat_api_key';
 
 interface StorageData {
   chatHistory: string;
@@ -45,8 +43,6 @@ export default function DatingChatAssistant() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState('b9c04fd4-3859-404a-91e6-bb2d702b6f07');
-  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_KEY);
@@ -57,10 +53,6 @@ export default function DatingChatAssistant() {
       setTheirProfile(data.theirProfile || '');
       setSelectedStyle(data.selectedStyle || 'sincere');
       setIsSaved(true);
-    }
-    const savedApiKey = localStorage.getItem(API_KEY_STORAGE);
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
     }
   }, []);
 
@@ -75,12 +67,6 @@ export default function DatingChatAssistant() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [chatHistory, myProfile, theirProfile, selectedStyle]);
-
-  const saveApiKey = () => {
-    localStorage.setItem(API_KEY_STORAGE, apiKey);
-    setShowSettings(false);
-    setError(null);
-  };
 
   const clearAllData = () => {
     if (confirm('确定要清空所有数据吗？')) {
@@ -98,51 +84,33 @@ export default function DatingChatAssistant() {
       setError('请输入聊天记录');
       return;
     }
-    if (!apiKey.trim()) {
-      setError('请先配置 API Key');
-      setShowSettings(true);
-      return;
-    }
+
     setIsGenerating(true);
     setError(null);
     setReplies([]);
-    const systemPrompt = `你是一个相亲聊天助手，模拟用户本人回复消息。
-规则：
-- 分析用户说话风格（用词、语气、句式）
-- 模拟用户身份回复
-- 口语化、自然、像真人发微信
-- 不要AI语气，不要书面化
-- 不要太长，微信风格短句
-用户信息：${myProfile || '未提供'}
-对方信息：${theirProfile || '未提供'}
-回复风格：${stylePrompts[selectedStyle]}
-输出3条回复，用"---"分隔。`;
 
     try {
-      const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
+      const response = await fetch('/api/doubao-chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: 'doubao-seed-2-0-mini-260215',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `聊天记录：\n${chatHistory}\n\n请模拟我的语气回复对方最后一条消息，生成3个回复方案。` },
-          ],
-          temperature: 0.9,
-          max_tokens: 500,
+          chatHistory,
+          myProfile,
+          theirProfile,
+          selectedStyle,
         }),
       });
+
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.error?.message || `API错误: ${response.status}`);
+        throw new Error(errData.error || `API错误: ${response.status}`);
       }
+
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '';
-      const parts = content.split('---').map((p: string) => p.trim()).filter(Boolean);
-      setReplies(parts.length > 0 ? parts : [content]);
+      setReplies(data.replies || []);
+
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '生成失败';
       setError(errorMsg);
@@ -158,119 +126,151 @@ export default function DatingChatAssistant() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
-      <div className="container mx-auto px-4 py-6 max-w-5xl">
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Heart className="w-7 h-7 text-pink-500" />
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-500 bg-clip-text text-transparent">
-              聊天助手
-            </h1>
-            <Sparkles className="w-5 h-5 text-amber-500" />
-            <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} className="ml-2">
-              <Settings className="w-5 h-5 text-gray-500" />
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">
+    <div className="min-h-screen bg-slate-50">
+      <div className="container mx-auto px-4 py-12 max-w-4xl">
+        {/* 标题 */}
+        <div className="text-center mb-12">
+          <h1 className="text-3xl font-semibold text-slate-800 mb-2 tracking-tight">
+            聊天助手
+          </h1>
+          <p className="text-sm text-slate-500">
             AI 帮你生成高情商回复
-            {isSaved && <span className="text-green-600 ml-2">· 已自动保存</span>}
+            {isSaved && <span className="text-emerald-600 ml-2">· 已自动保存</span>}
           </p>
         </div>
-        {showSettings && (
-          <Card className="mb-4 border-amber-200 bg-amber-50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                API 配置
-              </CardTitle>
-              <CardDescription>
-                需要配置豆包 API Key 才能使用（
-                <a href="https://console.volcengine.com/ark" target="_blank" className="text-pink-600 underline">
-                  点击获取
-                </a>
-                ）
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex gap-2">
-                <Input type="password" placeholder="输入豆包 API Key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="flex-1" />
-                <Button onClick={saveApiKey} className="bg-pink-500 hover:bg-pink-600">保存</Button>
-              </div>
-              <p className="text-xs text-gray-500">API Key 保存在浏览器本地，不会上传到服务器</p>
-            </CardContent>
-          </Card>
-        )}
-        <div className="grid lg:grid-cols-2 gap-4">
-          <div className="space-y-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4 text-pink-500" />
+
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* 左侧输入 */}
+          <div className="space-y-6">
+            {/* 聊天记录 */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium text-slate-700 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-teal-500" />
                   聊天记录
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Textarea placeholder="对方：你好啊\n我：你好呀\n对方：在干嘛？" className="min-h-[150px] resize-none" value={chatHistory} onChange={(e) => setChatHistory(e.target.value)} />
+                <Textarea
+                  placeholder="对方：你好啊&#10;我：你好呀&#10;对方：在干嘛？"
+                  className="min-h-[140px] resize-none border-slate-200 focus:border-teal-400 focus:ring-teal-400"
+                  value={chatHistory}
+                  onChange={(e) => setChatHistory(e.target.value)}
+                />
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="w-4 h-4 text-pink-500" />
-                  人设信息（可选）
+
+            {/* 人设 */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-medium text-slate-700 flex items-center gap-2">
+                  <User className="w-4 h-4 text-teal-500" />
+                  人设信息
+                  <span className="text-xs font-normal text-slate-400 ml-1">可选</span>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Input placeholder="你的性格特点" value={myProfile} onChange={(e) => setMyProfile(e.target.value)} />
-                <Input placeholder="TA 的信息" value={theirProfile} onChange={(e) => setTheirProfile(e.target.value)} />
+                <Input
+                  placeholder="你的性格特点"
+                  className="border-slate-200 focus:border-teal-400 focus:ring-teal-400"
+                  value={myProfile}
+                  onChange={(e) => setMyProfile(e.target.value)}
+                />
+                <Input
+                  placeholder="TA 的信息"
+                  className="border-slate-200 focus:border-teal-400 focus:ring-teal-400"
+                  value={theirProfile}
+                  onChange={(e) => setTheirProfile(e.target.value)}
+                />
               </CardContent>
             </Card>
-            <Card>
-              <CardContent className="pt-4">
+
+            {/* 风格选择 */}
+            <Card className="border-slate-200 shadow-sm">
+              <CardContent className="pt-5">
                 <Tabs value={selectedStyle} onValueChange={setSelectedStyle}>
-                  <TabsList className="w-full grid grid-cols-5 h-9">
+                  <TabsList className="w-full h-9 bg-slate-100 border border-slate-200">
                     {replyStyles.map((style) => (
-                      <TabsTrigger key={style.id} value={style.id} className="text-xs">{style.name}</TabsTrigger>
+                      <TabsTrigger 
+                        key={style.id} 
+                        value={style.id} 
+                        className="text-sm data-[state=active]:bg-white data-[state=active]:text-teal-600 data-[state=active]:shadow-sm"
+                      >
+                        {style.name}
+                      </TabsTrigger>
                     ))}
                   </TabsList>
                 </Tabs>
               </CardContent>
             </Card>
-            <div className="flex gap-2">
-              <Button onClick={generateReply} disabled={isGenerating || !chatHistory.trim()} className="flex-1 h-11 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600">
-                {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />思考中...</> : <><Send className="w-4 h-4 mr-2" />生成回复</>}
+
+            {/* 按钮 */}
+            <div className="flex gap-3">
+              <Button
+                onClick={generateReply}
+                disabled={isGenerating || !chatHistory.trim()}
+                className="flex-1 h-10 bg-teal-600 hover:bg-teal-700 text-white font-medium shadow-sm"
+              >
+                {isGenerating ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />生成中...</>
+                ) : (
+                  <><Send className="w-4 h-4 mr-2" />生成回复</>
+                )}
               </Button>
-              <Button variant="outline" onClick={clearAllData} className="px-3">
-                <Trash2 className="w-4 h-4" />
+              <Button 
+                variant="outline" 
+                onClick={clearAllData} 
+                className="h-10 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+              >
+                <Trash2 className="w-4 h-4 text-slate-500" />
               </Button>
             </div>
-            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{error}</div>}
+
+            {/* 错误提示 */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                {error}
+              </div>
+            )}
           </div>
-          <Card className="min-h-[400px]">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-500" />
+
+          {/* 右侧回复 */}
+          <Card className="border-slate-200 shadow-sm min-h-[500px]">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium text-slate-700">
                 AI 回复建议
               </CardTitle>
             </CardHeader>
             <CardContent>
               {!isGenerating && replies.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-[280px] text-gray-400">
-                  <Heart className="w-12 h-12 mb-3 text-pink-200" />
-                  <p>输入聊天记录，点击生成</p>
+                <div className="flex flex-col items-center justify-center h-[360px] text-slate-400">
+                  <MessageSquare className="w-12 h-12 mb-3 text-slate-200" />
+                  <p className="text-sm">输入聊天记录，点击生成</p>
                 </div>
               )}
+              
               {!isGenerating && replies.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {replies.map((reply, i) => (
-                    <div key={i} className="p-3 bg-pink-50 rounded-lg border border-pink-100">
-                      <div className="flex justify-between items-start gap-2">
+                    <div key={i} className="p-4 bg-white border border-slate-200 rounded-lg hover:border-teal-300 hover:shadow-sm transition-all">
+                      <div className="flex justify-between items-start gap-3">
                         <div className="flex-1">
-                          <Badge className="mb-1 bg-pink-100 text-pink-700">方案{i + 1}</Badge>
-                          <p className="text-sm whitespace-pre-wrap">{reply}</p>
+                          <div className="text-xs font-medium text-teal-600 mb-2">
+                            方案 {i + 1}
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{reply}</p>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => copyReply(i, reply)}>
-                          {copiedIndex === i ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4 text-pink-500" />}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => copyReply(i, reply)}
+                          className="h-8 w-8 hover:bg-slate-100"
+                        >
+                          {copiedIndex === i ? (
+                            <Check className="w-4 h-4 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-4 h-4 text-slate-400" />
+                          )}
                         </Button>
                       </div>
                     </div>
