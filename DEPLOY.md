@@ -1,9 +1,37 @@
+# 部署指南
+
+## ✅ 代码已准备就绪
+
+代码已更新，包含以下改动：
+- ✅ 豆包 API 已测试通过
+- ✅ 默认 API Key 已配置
+- ✅ 模型已激活：doubao-seed-2-0-mini-260215
+
+## 🚀 部署步骤
+
+### 方法 1：通过 Vercel Dashboard 重新部署（推荐）
+
+1. 打开你的 [Vercel Dashboard](https://vercel.com/dashboard)
+2. 找到 `projects` 项目
+3. 点击项目进入详情页
+4. 点击 **Deployments** 标签
+5. 点击右上角的 **Redeploy** 按钮
+6. 等待部署完成（约 1-2 分钟）
+
+### 方法 2：通过 GitHub 更新代码
+
+1. 打开你的 GitHub 仓库
+2. 找到 `src/app/page.tsx` 文件
+3. 用下面的代码替换：
+
+```typescript
 'use client';
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -48,6 +76,7 @@ export default function DatingChatAssistant() {
   const [apiKey, setApiKey] = useState('b9c04fd4-3859-404a-91e6-bb2d702b6f07');
   const [showSettings, setShowSettings] = useState(false);
 
+  // 加载保存的数据
   useEffect(() => {
     const savedData = localStorage.getItem(STORAGE_KEY);
     if (savedData) {
@@ -58,12 +87,14 @@ export default function DatingChatAssistant() {
       setSelectedStyle(data.selectedStyle || 'sincere');
       setIsSaved(true);
     }
+    
     const savedApiKey = localStorage.getItem(API_KEY_STORAGE);
     if (savedApiKey) {
       setApiKey(savedApiKey);
     }
   }, []);
 
+  // 自动保存
   useEffect(() => {
     const timer = setTimeout(() => {
       if (chatHistory || myProfile || theirProfile) {
@@ -76,6 +107,7 @@ export default function DatingChatAssistant() {
     return () => clearTimeout(timer);
   }, [chatHistory, myProfile, theirProfile, selectedStyle]);
 
+  // 保存 API Key
   const saveApiKey = () => {
     localStorage.setItem(API_KEY_STORAGE, apiKey);
     setShowSettings(false);
@@ -93,32 +125,40 @@ export default function DatingChatAssistant() {
     }
   };
 
+  // 生成回复
   const generateReply = async () => {
     if (!chatHistory.trim()) {
       setError('请输入聊天记录');
       return;
     }
+
     if (!apiKey.trim()) {
-      setError('请先配置 API Key');
+      setError('请先配置 API Key（点击右上角设置按钮）');
       setShowSettings(true);
       return;
     }
+
     setIsGenerating(true);
     setError(null);
     setReplies([]);
+
     const systemPrompt = `你是一个相亲聊天助手，模拟用户本人回复消息。
+
 规则：
 - 分析用户说话风格（用词、语气、句式）
 - 模拟用户身份回复
 - 口语化、自然、像真人发微信
 - 不要AI语气，不要书面化
 - 不要太长，微信风格短句
+
 用户信息：${myProfile || '未提供'}
 对方信息：${theirProfile || '未提供'}
 回复风格：${stylePrompts[selectedStyle]}
+
 输出3条回复，用"---"分隔。`;
 
     try {
+      // 直接调用豆包 API
       const response = await fetch('https://ark.cn-beijing.volces.com/api/v3/chat/completions', {
         method: 'POST',
         headers: {
@@ -135,14 +175,18 @@ export default function DatingChatAssistant() {
           max_tokens: 500,
         }),
       });
+
       if (!response.ok) {
         const errData = await response.json();
         throw new Error(errData.error?.message || `API错误: ${response.status}`);
       }
+
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content || '';
+      
       const parts = content.split('---').map((p: string) => p.trim()).filter(Boolean);
       setReplies(parts.length > 0 ? parts : [content]);
+
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '生成失败';
       setError(errorMsg);
@@ -160,6 +204,7 @@ export default function DatingChatAssistant() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-rose-50">
       <div className="container mx-auto px-4 py-6 max-w-5xl">
+        {/* 标题 */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Heart className="w-7 h-7 text-pink-500" />
@@ -167,7 +212,12 @@ export default function DatingChatAssistant() {
               相亲聊天助手
             </h1>
             <Sparkles className="w-5 h-5 text-amber-500" />
-            <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} className="ml-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setShowSettings(!showSettings)}
+              className="ml-2"
+            >
               <Settings className="w-5 h-5 text-gray-500" />
             </Button>
           </div>
@@ -176,6 +226,8 @@ export default function DatingChatAssistant() {
             {isSaved && <span className="text-green-600 ml-2">· 已自动保存</span>}
           </p>
         </div>
+
+        {/* API Key 设置 */}
         {showSettings && (
           <Card className="mb-4 border-amber-200 bg-amber-50">
             <CardHeader className="pb-2">
@@ -193,15 +245,28 @@ export default function DatingChatAssistant() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex gap-2">
-                <Input type="password" placeholder="输入豆包 API Key" value={apiKey} onChange={(e) => setApiKey(e.target.value)} className="flex-1" />
-                <Button onClick={saveApiKey} className="bg-pink-500 hover:bg-pink-600">保存</Button>
+                <Input
+                  type="password"
+                  placeholder="输入豆包 API Key"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  className="flex-1"
+                />
+                <Button onClick={saveApiKey} className="bg-pink-500 hover:bg-pink-600">
+                  保存
+                </Button>
               </div>
-              <p className="text-xs text-gray-500">API Key 保存在浏览器本地，不会上传到服务器</p>
+              <p className="text-xs text-gray-500">
+                API Key 保存在浏览器本地，不会上传到服务器
+              </p>
             </CardContent>
           </Card>
         )}
+
         <div className="grid lg:grid-cols-2 gap-4">
+          {/* 左侧输入 */}
           <div className="space-y-3">
+            {/* 聊天记录 */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -210,9 +275,16 @@ export default function DatingChatAssistant() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <Textarea placeholder="对方：你好啊\n我：你好呀\n对方：在干嘛？" className="min-h-[150px] resize-none" value={chatHistory} onChange={(e) => setChatHistory(e.target.value)} />
+                <Textarea
+                  placeholder="对方：你好啊\n我：你好呀\n对方：在干嘛？"
+                  className="min-h-[150px] resize-none"
+                  value={chatHistory}
+                  onChange={(e) => setChatHistory(e.target.value)}
+                />
               </CardContent>
             </Card>
+
+            {/* 人设 */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -221,31 +293,61 @@ export default function DatingChatAssistant() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Input placeholder="你的性格特点" value={myProfile} onChange={(e) => setMyProfile(e.target.value)} />
-                <Input placeholder="TA 的信息" value={theirProfile} onChange={(e) => setTheirProfile(e.target.value)} />
+                <Input
+                  placeholder="你的性格特点"
+                  value={myProfile}
+                  onChange={(e) => setMyProfile(e.target.value)}
+                />
+                <Input
+                  placeholder="TA 的信息"
+                  value={theirProfile}
+                  onChange={(e) => setTheirProfile(e.target.value)}
+                />
               </CardContent>
             </Card>
+
+            {/* 风格选择 */}
             <Card>
               <CardContent className="pt-4">
                 <Tabs value={selectedStyle} onValueChange={setSelectedStyle}>
                   <TabsList className="w-full grid grid-cols-5 h-9">
                     {replyStyles.map((style) => (
-                      <TabsTrigger key={style.id} value={style.id} className="text-xs">{style.name}</TabsTrigger>
+                      <TabsTrigger key={style.id} value={style.id} className="text-xs">
+                        {style.name}
+                      </TabsTrigger>
                     ))}
                   </TabsList>
                 </Tabs>
               </CardContent>
             </Card>
+
+            {/* 按钮 */}
             <div className="flex gap-2">
-              <Button onClick={generateReply} disabled={isGenerating || !chatHistory.trim()} className="flex-1 h-11 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600">
-                {isGenerating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />思考中...</> : <><Send className="w-4 h-4 mr-2" />生成回复</>}
+              <Button
+                onClick={generateReply}
+                disabled={isGenerating || !chatHistory.trim()}
+                className="flex-1 h-11 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600"
+              >
+                {isGenerating ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />思考中...</>
+                ) : (
+                  <><Send className="w-4 h-4 mr-2" />生成回复</>
+                )}
               </Button>
               <Button variant="outline" onClick={clearAllData} className="px-3">
                 <Trash2 className="w-4 h-4" />
               </Button>
             </div>
-            {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">{error}</div>}
+
+            {/* 错误提示 */}
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+                {error}
+              </div>
+            )}
           </div>
+
+          {/* 右侧回复 */}
           <Card className="min-h-[400px]">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
@@ -260,6 +362,7 @@ export default function DatingChatAssistant() {
                   <p>输入聊天记录，点击生成</p>
                 </div>
               )}
+              
               {!isGenerating && replies.length > 0 && (
                 <div className="space-y-2">
                   {replies.map((reply, i) => (
@@ -284,3 +387,13 @@ export default function DatingChatAssistant() {
     </div>
   );
 }
+```
+
+4. 点击 **Commit** 保存
+5. Vercel 会自动检测到更新并重新部署
+
+## ✅ 部署完成后
+
+访问 https://projects-weld-three.vercel.app 即可使用！
+
+默认 API Key 已配置，可直接使用。
