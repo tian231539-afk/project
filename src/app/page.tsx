@@ -66,7 +66,7 @@ export default function DatingChatAssistant() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (chatHistory || myProfile || otherProfile) {
+      if (chatHistory || myProfile || theirProfile) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           chatHistory, myProfile, theirProfile, selectedStyle,
         }));
