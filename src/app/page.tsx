@@ -164,7 +164,7 @@ export default function DatingChatAssistant() {
           <div className="flex items-center justify-center gap-2 mb-2">
             <Heart className="w-7 h-7 text-pink-500" />
             <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-500 bg-clip-text text-transparent">
-              相亲聊天助手
+              聊天助手
             </h1>
             <Sparkles className="w-5 h-5 text-amber-500" />
             <Button variant="ghost" size="icon" onClick={() => setShowSettings(!showSettings)} className="ml-2">
